@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
-import mongoose from 'mongoose';
 import { config, getApiUrl } from './config';
+import { connectDatabase } from './database';
 
 // Import route handlers
 import usersRouter from './routes/users';
@@ -27,20 +27,23 @@ app.use((req: Request, res: Response, next) => {
   }
 });
 
-// MongoDB Connection
-mongoose
-  .connect(config.mongodbUri)
+// Initialize database connection
+let dbInitialized = false;
+connectDatabase()
   .then(() => {
-    console.log(`Connected to MongoDB at ${config.mongodbUri}`);
+    dbInitialized = true;
   })
   .catch((error) => {
-    console.error('MongoDB connection error:', error);
+    console.error('Failed to initialize database on startup:', error);
+    // Continue running even if DB connection fails initially
+    // The app can still serve requests, but DB operations will fail
   });
 
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({
     status: 'Server is running',
+    database: dbInitialized ? 'connected' : 'connecting',
     apiUrl: getApiUrl(),
     port: config.port,
     isDevelopment: config.isDevelopment,
@@ -83,14 +86,15 @@ app.use((req: Request, res: Response) => {
 });
 
 // Start server
-app.listen(config.port, () => {
+const PORT = config.port;
+const server = app.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════╗
 ║    OctoFit Tracker Backend Server      ║
 ╚════════════════════════════════════════╝
 
 API URL: ${getApiUrl()}
-Port: ${config.port}
+Port: ${PORT}
 Environment: ${config.isDevelopment ? 'development' : 'production'}
 MongoDB: ${config.mongodbUri}
 
@@ -109,4 +113,21 @@ Available endpoints:
 
 Ready to accept requests! 🚀
   `);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('\n⛔ SIGTERM received, shutting down gracefully...');
+  server.close(async () => {
+    console.log('✓ HTTP server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('\n⛔ SIGINT received, shutting down gracefully...');
+  server.close(async () => {
+    console.log('✓ HTTP server closed');
+    process.exit(0);
+  });
 });

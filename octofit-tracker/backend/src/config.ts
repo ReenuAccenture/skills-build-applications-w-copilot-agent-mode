@@ -23,6 +23,6 @@ export const getServerPort = (): number => {
 export const config = {
   port: getServerPort(),
   apiUrl: getApiUrl(),
-  mongodbUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/octofit',
+  mongodbUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/octofit_db',
   isDevelopment: process.env.NODE_ENV !== 'production',
 };
